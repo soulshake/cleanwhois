@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Author: AJ
+# A simple script to make whois results take up less space on the screen
+# It's more or less working on osx, but i don't know if ubuntu will like it.
+
+# To do:
+# 1. --verbose option
+# 2. Replace multiple blank lines with a single blank line instead of removing all blank lines completely
+
+dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+mkdir -pv $dir/cleanwhois 
+
+garbagefile="$dir/cleanwhois/garbage"
+tempfile="$dir/cleanwhois/cleanwhois.txt"
+testfile="$dir/cleanwhois/example_whois.txt"
+touch "$garbagefile"
+touch "$tempfile"
+
+INPUT="$1"
+
+printf "\n $(tput rev) -- cleanwhois v0.1 -- $(tput sgr0) \n"
+
+while test "$#" -gt -1; do
+  case "$1" in
+		""|-h|--help)
+			echo "Usage: cwhois [domain name] [options]"
+			echo " "
+			echo "Options:"
+			echo "	-h, --help		show brief help"
+			echo "	-a, --add		append \"provided lines\" to garbage file for omission in future queries"
+			echo "	-p, --print-garbage	show full contents of garbage file"
+			echo "  -v, --verbose		show full whois, including junk lines (printed in gray) (to do)"
+			echo "  -t, --test		use test data, to keep from being ratelimited"
+			echo " "
+			exit 0
+			;;
+		-a|--add)
+			shift
+			echo "$(tput setaf 1)The following lines will be appended to the garbage file for omission in future whois lookups:$(tput sgr0)"
+			echo "$1"
+			read -p "$(tput setaf 1)Would you like to proceed? (y/n) $(tput sgr0)" -n 1 -r
+			if [[ "$REPLY" =~ ^[Yy]$ ]]
+			then	
+				echo "$1" >> "$garbagefile"
+				sort "$garbagefile" -o garbage.temp && uniq garbage.temp "$garbagefile" # && rm garbage.temp
+				echo " " && echo "Your input has been added and will not appear in future cwhois lookups."
+				exit 0
+			else
+				echo " " && echo "Nothing done."
+				exit 1
+			fi
+			shift
+			;;	
+		-p|--print-garbage)
+			shift
+			echo "$(tput setaf 5)The garbage file current contains the following lines, which are omitted from cwhois lookups:$(tput sgr0)"
+			cat "$garbagefile"
+			exit 0
+			shift
+			;;	
+		-t|--test)
+			shift
+			echo "$(tput setaf 5)Using $testfile as input: $(tput sgr0)"
+			cat "$testfile" | sed '/^$/d' > "$tempfile"
+			shift
+			;;	
+		*)
+			whois "$1" | sed '/^$/d' > "$tempfile"
+			break
+			;;
+	esac
+done
+
+	grep --color=always "$tempfile" --file="$garbagefile" --context=100	# Make the garbage a different color instead of removing it completely
+#	grep "$tempfile" -vow --file="$garbagefile" 			# Just grep out the garbage
+
+	garbagecount=$(grep "$tempfile" -owc --file="$garbagefile")
+	echo "$(tput setaf 5)$garbagecount lines of garbage omitted.$(tput sgr0)"
+	rm "$tempfile"
+
+
+
+
